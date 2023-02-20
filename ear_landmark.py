@@ -1,0 +1,148 @@
+import cv2
+import mediapipe as mp
+
+
+mp_holistic=mp.solutions.holistic
+mp_drawing=mp.solutions.drawing_utils
+mp_drawing_styles = mp.solutions.drawing_styles
+
+
+def mediapipe_detection(image, model):
+	image=cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+	image.flags.writeable=False
+	results=model.process(image)
+	image.flags.writeable=True
+	image=cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
+	return image, results
+
+def draw_landmarks(image, results):
+	mp_drawing.draw_landmarks(
+		image, results.pose_landmarks, mp_holistic)
+	mp_drawing.draw_landmarks(
+		image, results.pose_landmarks, mp_holistic)
+
+
+def draw_styled_landmarks(image, results):
+	# mp_drawing.draw_landmarks(
+	# 	image,
+	# 	results.pose_landmarks,
+	# 	mp_holistic.POSE_CONNECTIONS,
+	# 	mp_drawing.DrawingSpec(color=(80,22,10), thickness=2, circle_radius=2))
+	#
+	# mp_drawing.draw_landmarks(
+	# 	image,
+	# 	results.pose_landmarks,
+	# 	mp_holistic.PoseLandmark.LEFT_EAR,
+	# 	mp_drawing.DrawingSpec(color=(80,44,121), thickness=2, cricle_radius=2)
+	# 	)
+	# mp_drawing.draw_landmarks(image,
+	# 						  results.pose_landmarks,
+	# 						  POSE_CONNECTION_MOD
+	# 						  )
+
+	mp_drawing.draw_landmarks(image,
+							  results.pose_landmarks,
+							  mp_holistic.POSE_CONNECTIONS
+							  )
+
+
+cap=cv2.VideoCapture(0)
+
+with mp_holistic.Holistic( min_detection_confidence=0.5, min_tracking_confidence=0.5) as holistic:
+	while cap.isOpened():
+		ret, frame=cap.read()
+		image, results=mediapipe_detection(frame, holistic)
+
+		# cv2.putText(img=image, text='Centre your Face', org=(180,80), fontFace=cv2.FONT_HERSHEY_SIMPLEX, fontScale=1, color=(0,0,255), thickness=2)
+		# print(results)
+		left_ear_x=results.pose_landmarks.landmark[7].x
+		left_ear_y=results.pose_landmarks.landmark[7].y
+		right_ear_x = results.pose_landmarks.landmark[8].x
+		right_ear_y = results.pose_landmarks.landmark[8].y
+		# print('left ear x: ', left_ear_x)
+		# print('left ear y: ', left_ear_y)
+		# print('right ear x: ', right_ear_x)
+		# print('right ear y: ', right_ear_y)
+		left_shoulder_x=results.pose_landmarks.landmark[11].x
+		left_shoulder_y=results.pose_landmarks.landmark[11].y
+		left_shoulder_z=results.pose_landmarks.landmark[11].z
+		right_shoulder_x=results.pose_landmarks.landmark[12].x
+		right_shoulder_y=results.pose_landmarks.landmark[12].y
+		right_shoulder_z=results.pose_landmarks.landmark[12].z
+		# shoulder_midpt=m.sqrt((left_shoulder_x-right_shoulder_x)**2+(left_shoulder_y-right_shoulder_y)**2+(left_shoulder_z-right_shoulder_z)**2)
+		# print(shoulder_midpt)
+		shoulder_mid_x=(left_shoulder_x+right_shoulder_x)/2
+		shoulder_mid_y=(left_shoulder_y+right_shoulder_y)/2
+		shoulder_mid_z=(left_shoulder_z+right_shoulder_z)/2
+		chin_x=results.face_landmarks.landmark[152].x
+		chin_y=results.face_landmarks.landmark[152].y
+		chin_z=results.face_landmarks.landmark[152].z
+		neck_mid_x=(shoulder_mid_x+chin_x)/2
+		neck_mid_y=(shoulder_mid_y+chin_y)/2
+		neck_mid_z=(shoulder_mid_z+chin_z)/2
+		# print("Top: ", results.face_landmarks.landmark[10].x)
+		# print("Face bottom x", results.face_landmarks.landmark[152].x)
+		# print("Face bottom y", results.face_landmarks.landmark[152].y)
+		# print('Chin x: ',chin_x)
+		# print('neck x: ',neck_mid_x)
+		# print('shoulder x: ',shoulder_mid_x)
+		# print('chin y: ', chin_y)
+		# print('neck y: ', neck_mid_y)
+		# print('shoulder y: ', shoulder_mid_y)
+		# print('chin x: ',chin_x)
+		# print('neck x: ',neck_mid_x)
+		# print('shoulder x: ', shoulder_mid_x)
+		# print()
+
+		image_height, image_width, _ = image.shape
+		image_rightear_x = results.pose_landmarks.landmark[mp_holistic.PoseLandmark.RIGHT_EAR].x * image_width-20
+		image_rightear_y = results.pose_landmarks.landmark[mp_holistic.PoseLandmark.RIGHT_EAR].y * image_height+20
+		image_leftear_x = results.pose_landmarks.landmark[mp_holistic.PoseLandmark.LEFT_EAR].x * image_width+16
+		image_leftear_y = results.pose_landmarks.landmark[mp_holistic.PoseLandmark.LEFT_EAR].y * image_height+18
+		image_neck_x = neck_mid_x * image_width
+		image_neck_y = neck_mid_y * image_height
+		cv2.circle(image, (int(image_neck_x), int(image_neck_y)), 2, [0, 0, 255], 2)
+		cv2.circle(image, (int(image_leftear_x), int(image_leftear_y)), 2, [0, 0, 255], 2)
+		cv2.circle(image, (int(image_rightear_x), int(image_rightear_y)), 2, [0, 0, 255], 2)
+
+		if results.pose_landmarks:
+			print(
+				f'Right Ear coordinates: ('
+				f'{image_rightear_x}, '
+				f'{image_rightear_y})'
+			)
+			print(
+				f'Left Ear coordinates: ('
+				f'{image_leftear_x}, '
+				f'{image_leftear_y})'
+			)
+			print(
+				f'Neck Midpoint coordinates ('
+				f'{image_neck_x}, '
+				f'{image_neck_y})'
+			)
+			print()
+		# print(image)
+		# print(results.pose_landmarks.landmark[11].x)
+		# print(results.pose_landmarks.landmark[12].x)
+		draw_styled_landmarks(image, results)
+
+		cv2.imshow('OpenCV Feed', image)
+
+		if cv2.waitKey(10) & 0xFF==ord('q'):
+			break
+
+	cap.release()
+	cv2.destroyAllWindows()
+
+# for landmark in mp_holistic.PoseLandmark:
+# 	print(landmark, landmark.value)
+	# print(results.pose_landmarks.landmark[7].x)
+	# print(results.pose_landmarks.landmark[8].x)
+	# print("Top: ", results.face_landmarks.landmark[10])
+	# print()
+	# print("Right", results.face_landmarks.landmark[234])
+	# print()
+	# print('Bottom', results.face_landmarks.landmark[152])
+	# print()
+	# print('Left',results.face_landmarks.landmark[454])
